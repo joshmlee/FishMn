@@ -745,3 +745,32 @@ Length distribution rows written: 4311
 
 Lake index written: lake_survey_data/lake_county_lakes.csv
 Done.
+
+[1/87] Fetching Aitkin County...
+  Found 257 lakes.
+  [1/257] Aitkin (DOW 01004000)
+  [2/257] Anderson (DOW 01003100)
+  [3/257] Anderson (DOW 01017700)
+  [4/257] Apple (DOW 01018000)
+  [5/257] Avenue (DOW 01019100)
+  [6/257] Bachelor (DOW 01016900)
+  [7/257] Baker (DOW 01028800)
+  [8/257] Ball Bluff (DOW 01004600)
+  [9/257] Bass (DOW 01007300)
+  [10/257] Bass (DOW 01019500)
+  [11/257] Bass (DOW 01006300)
+  [12/257] Bass (DOW 01018300)
+  [13/257] Bay (DOW 01004900)
+  [14/257] Bear (DOW 01006400)
+  [15/257] Bible (DOW 01014400)
+  [16/257] Big Pine (DOW 01015700)
+  [17/257] Big Sandy (DOW 01006200)
+  [18/257] Birch (DOW 01020600)
+  [19/257] Blackface (DOW 01004500)
+  [20/257] Black Shadow (DOW 01016500)
+  [21/257] Blackwater (DOW 01019800)
+  [22/257] Blind (DOW 01018800)
+  [23/257] Blue (DOW 01018100)
+  [24/257] Bone (DOW 01025400)
+  [25/257] Boot (DOW 01005500)
+  [26/257] Brennen (DOW 01022600)
