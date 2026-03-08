@@ -1,0 +1,4 @@
+# Scraper output (in progress)
+scraper_output.log
+lake_survey_data/all_counties_*.csv
+lake_survey_data/.done_*
