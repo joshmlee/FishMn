@@ -1,6 +1,7 @@
 """
 MN DNR LakeFinder Survey Scraper
-Pulls fish survey data for all lakes in a given county.
+Pulls fish survey data for all lakes in all 87 Minnesota counties.
+Supports resuming: skips counties whose output files already exist.
 """
 
 import json
@@ -13,9 +14,98 @@ import requests
 GAZETTEER_URL = "https://maps.dnr.state.mn.us/cgi-bin/gazetteer/gazetteer2.cgi"
 DETAIL_URL = "https://maps.dnr.state.mn.us/cgi-bin/lakefinder/detail.cgi"
 
-COUNTY_ID = "38"
-COUNTY_NAME = "Lake"
 OUTPUT_DIR = "lake_survey_data"
+
+# All 87 MN counties, DNR ID = alphabetical position (1-87)
+MN_COUNTIES = [
+    (1,  "Aitkin"),
+    (2,  "Anoka"),
+    (3,  "Becker"),
+    (4,  "Beltrami"),
+    (5,  "Benton"),
+    (6,  "Big Stone"),
+    (7,  "Blue Earth"),
+    (8,  "Brown"),
+    (9,  "Carlton"),
+    (10, "Carver"),
+    (11, "Cass"),
+    (12, "Chippewa"),
+    (13, "Chisago"),
+    (14, "Clay"),
+    (15, "Clearwater"),
+    (16, "Cook"),
+    (17, "Cottonwood"),
+    (18, "Crow Wing"),
+    (19, "Dakota"),
+    (20, "Dodge"),
+    (21, "Douglas"),
+    (22, "Faribault"),
+    (23, "Fillmore"),
+    (24, "Freeborn"),
+    (25, "Goodhue"),
+    (26, "Grant"),
+    (27, "Hennepin"),
+    (28, "Houston"),
+    (29, "Hubbard"),
+    (30, "Isanti"),
+    (31, "Itasca"),
+    (32, "Jackson"),
+    (33, "Kanabec"),
+    (34, "Kandiyohi"),
+    (35, "Kittson"),
+    (36, "Koochiching"),
+    (37, "Lac qui Parle"),
+    (38, "Lake"),
+    (39, "Lake of the Woods"),
+    (40, "Le Sueur"),
+    (41, "Lincoln"),
+    (42, "Lyon"),
+    (43, "McLeod"),
+    (44, "Mahnomen"),
+    (45, "Marshall"),
+    (46, "Martin"),
+    (47, "Meeker"),
+    (48, "Mille Lacs"),
+    (49, "Morrison"),
+    (50, "Mower"),
+    (51, "Murray"),
+    (52, "Nicollet"),
+    (53, "Nobles"),
+    (54, "Norman"),
+    (55, "Olmsted"),
+    (56, "Otter Tail"),
+    (57, "Pennington"),
+    (58, "Pine"),
+    (59, "Pipestone"),
+    (60, "Polk"),
+    (61, "Pope"),
+    (62, "Ramsey"),
+    (63, "Red Lake"),
+    (64, "Redwood"),
+    (65, "Renville"),
+    (66, "Rice"),
+    (67, "Rock"),
+    (68, "Roseau"),
+    (69, "St. Louis"),
+    (70, "Scott"),
+    (71, "Sherburne"),
+    (72, "Sibley"),
+    (73, "Stearns"),
+    (74, "Steele"),
+    (75, "Stevens"),
+    (76, "Swift"),
+    (77, "Todd"),
+    (78, "Traverse"),
+    (79, "Wabasha"),
+    (80, "Wadena"),
+    (81, "Waseca"),
+    (82, "Washington"),
+    (83, "Watonwan"),
+    (84, "Wilkin"),
+    (85, "Winona"),
+    (86, "Wright"),
+    (87, "Yellow Medicine"),
+]
 
 
 def fetch_jsonp(url: str, params: dict) -> dict:
@@ -23,7 +113,6 @@ def fetch_jsonp(url: str, params: dict) -> dict:
     params["callback"] = "cb"
     response = requests.get(url, params=params, timeout=30)
     response.raise_for_status()
-    # Strip JSONP wrapper: cb({...}) or cb([...])
     text = response.text.strip()
     match = re.match(r"^\w+\((.*)\);?$", text, re.DOTALL)
     if match:
@@ -32,7 +121,6 @@ def fetch_jsonp(url: str, params: dict) -> dict:
 
 
 def get_lakes_in_county(county_id: str) -> list[dict]:
-    """Return list of lakes for the given county ID."""
     data = fetch_jsonp(GAZETTEER_URL, {"type": "lake", "county": county_id})
     if data.get("status") == "ERROR":
         raise RuntimeError(f"Gazetteer error: {data.get('message')}")
@@ -40,18 +128,17 @@ def get_lakes_in_county(county_id: str) -> list[dict]:
 
 
 def get_lake_surveys(dow_number: str) -> dict:
-    """Return survey data for a lake by its DOW number."""
     data = fetch_jsonp(DETAIL_URL, {"type": "lake_survey", "id": dow_number})
     if data.get("status") == "ERROR":
         return {}
     return data.get("result", {})
 
 
-def flatten_catch_summary(dow: str, lake_name: str, survey: dict, catch: dict) -> dict:
-    """Flatten one fishCatchSummary row for CSV output."""
+def flatten_catch_summary(dow: str, lake_name: str, county_name: str, survey: dict, catch: dict) -> dict:
     return {
         "dow_number": dow,
         "lake_name": lake_name,
+        "county": county_name,
         "survey_id": survey.get("surveyID", ""),
         "survey_date": survey.get("surveyDate", ""),
         "survey_type": survey.get("surveyType", ""),
@@ -70,39 +157,45 @@ def flatten_catch_summary(dow: str, lake_name: str, survey: dict, catch: dict) -
     }
 
 
-def flatten_length_row(dow: str, lake_name: str, survey: dict, species: str, lengths: dict) -> dict:
-    """Flatten one species length-distribution row for CSV output."""
+def flatten_length_row(dow: str, lake_name: str, county_name: str, survey: dict, species: str, lengths: dict) -> dict:
     row = {
         "dow_number": dow,
         "lake_name": lake_name,
+        "county": county_name,
         "survey_id": survey.get("surveyID", ""),
         "survey_date": survey.get("surveyDate", ""),
         "species": species,
+        "minimum_length": lengths.get("minimumLength", ""),
+        "fishCount": json.dumps(lengths.get("fishCount", [])),
+        "maximum_length": lengths.get("maximumLength", ""),
     }
-    row.update(lengths)
     return row
 
 
-def scrape_county(county_id: str, county_name: str):
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    catch_path = os.path.join(OUTPUT_DIR, f"{county_name.lower()}_county_catch_summaries.csv")
-    lengths_path = os.path.join(OUTPUT_DIR, f"{county_name.lower()}_county_length_distributions.csv")
-    lakes_path = os.path.join(OUTPUT_DIR, f"{county_name.lower()}_county_lakes.csv")
+def scrape_county(county_id: int, county_name: str, catch_writer, lengths_writer, lakes_writer):
+    safe_name = county_name.lower().replace(" ", "_").replace(".", "")
+    done_marker = os.path.join(OUTPUT_DIR, f".done_{safe_name}")
 
-    print(f"Fetching lake list for {county_name} County (ID={county_id})...")
-    lakes = get_lakes_in_county(county_id)
+    if os.path.exists(done_marker):
+        print(f"Skipping {county_name} County (already done).")
+        return
+
+    print(f"\n[{county_id}/87] Fetching {county_name} County...")
+    try:
+        lakes = get_lakes_in_county(str(county_id))
+    except Exception as e:
+        print(f"  ERROR fetching lake list: {e}")
+        return
+
     print(f"  Found {len(lakes)} lakes.")
 
-    # Write lake index
-    with open(lakes_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["id", "name", "county", "type"])
-        writer.writeheader()
-        for lake in lakes:
-            writer.writerow({k: lake.get(k, "") for k in ["id", "name", "county", "type"]})
-
-    catch_rows = []
-    length_rows = []
-    length_fieldnames = set()
+    for lake in lakes:
+        lakes_writer.writerow({
+            "id": lake.get("id", ""),
+            "name": lake.get("name", ""),
+            "county": county_name,
+            "type": lake.get("type", ""),
+        })
 
     for i, lake in enumerate(lakes):
         dow = str(lake["id"])
@@ -123,46 +216,60 @@ def scrape_county(county_id: str, county_name: str):
 
         for survey in surveys:
             for catch in survey.get("fishCatchSummaries", []):
-                catch_rows.append(flatten_catch_summary(dow, name, survey, catch))
+                catch_writer.writerow(flatten_catch_summary(dow, name, county_name, survey, catch))
 
             for species, lengths in survey.get("lengths", {}).items():
                 if isinstance(lengths, dict) and lengths:
-                    row = flatten_length_row(dow, name, survey, species, lengths)
-                    length_rows.append(row)
-                    length_fieldnames.update(lengths.keys())
+                    lengths_writer.writerow(flatten_length_row(dow, name, county_name, survey, species, lengths))
 
-        time.sleep(0.3)  # be polite to the server
+        time.sleep(0.3)
 
-    # Write catch summaries
-    if catch_rows:
-        catch_fields = list(catch_rows[0].keys())
-        with open(catch_path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=catch_fields)
-            writer.writeheader()
-            writer.writerows(catch_rows)
-        print(f"\nCatch summary rows written: {len(catch_rows)}")
-        print(f"  -> {catch_path}")
-    else:
-        print("\nNo catch summary data found.")
-
-    # Write length distributions
-    if length_rows:
-        # Build consistent fieldnames: metadata cols first, then sorted size bins
-        meta_cols = ["dow_number", "lake_name", "survey_id", "survey_date", "species"]
-        size_cols = sorted(length_fieldnames, key=lambda x: int(x.split("-")[0].replace("+", "")) if x.replace("-", "").replace("+", "").isdigit() else 999)
-        all_fields = meta_cols + [c for c in size_cols if c not in meta_cols]
-        with open(lengths_path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=all_fields, extrasaction="ignore")
-            writer.writeheader()
-            writer.writerows(length_rows)
-        print(f"Length distribution rows written: {len(length_rows)}")
-        print(f"  -> {lengths_path}")
-    else:
-        print("No length distribution data found.")
-
-    print(f"\nLake index written: {lakes_path}")
-    print("Done.")
+    # Mark county as done so we can resume if interrupted
+    open(done_marker, "w").close()
+    print(f"  Done with {county_name} County.")
 
 
 if __name__ == "__main__":
-    scrape_county(COUNTY_ID, COUNTY_NAME)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    catch_path = os.path.join(OUTPUT_DIR, "all_counties_catch_summaries.csv")
+    lengths_path = os.path.join(OUTPUT_DIR, "all_counties_length_distributions.csv")
+    lakes_path = os.path.join(OUTPUT_DIR, "all_counties_lakes.csv")
+
+    catch_fields = [
+        "dow_number", "lake_name", "county", "survey_id", "survey_date",
+        "survey_type", "survey_sub_type", "species", "gear", "gear_count",
+        "total_catch", "cpue", "quartile_count_low", "quartile_count_high",
+        "total_weight", "average_weight", "quartile_weight_low", "quartile_weight_high",
+    ]
+    length_fields = ["dow_number", "lake_name", "county", "survey_id", "survey_date", "species", "minimum_length", "fishCount", "maximum_length"]
+    lake_fields = ["id", "name", "county", "type"]
+
+    # Append mode so re-runs don't wipe existing data
+    catch_exists = os.path.exists(catch_path)
+    lengths_exists = os.path.exists(lengths_path)
+    lakes_exists = os.path.exists(lakes_path)
+
+    with (
+        open(catch_path, "a", newline="") as catch_f,
+        open(lengths_path, "a", newline="") as lengths_f,
+        open(lakes_path, "a", newline="") as lakes_f,
+    ):
+        catch_writer = csv.DictWriter(catch_f, fieldnames=catch_fields)
+        lengths_writer = csv.DictWriter(lengths_f, fieldnames=length_fields)
+        lakes_writer = csv.DictWriter(lakes_f, fieldnames=lake_fields)
+
+        if not catch_exists:
+            catch_writer.writeheader()
+        if not lengths_exists:
+            lengths_writer.writeheader()
+        if not lakes_exists:
+            lakes_writer.writeheader()
+
+        for county_id, county_name in MN_COUNTIES:
+            scrape_county(county_id, county_name, catch_writer, lengths_writer, lakes_writer)
+
+    print("\nAll counties complete.")
+    print(f"  {catch_path}")
+    print(f"  {lengths_path}")
+    print(f"  {lakes_path}")
