@@ -230,6 +230,12 @@ def scrape_county(county_id: int, county_name: str, catch_writer, lengths_writer
 
 
 if __name__ == "__main__":
+    import sys
+    # Optional args: start_id end_id (inclusive, 1-87)
+    # e.g. python mn_dnr_lake_scraper.py 11 15
+    start_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+    end_id   = int(sys.argv[2]) if len(sys.argv) > 2 else 87
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     catch_path = os.path.join(OUTPUT_DIR, "all_counties_catch_summaries.csv")
@@ -267,6 +273,8 @@ if __name__ == "__main__":
             lakes_writer.writeheader()
 
         for county_id, county_name in MN_COUNTIES:
+            if not (start_id <= county_id <= end_id):
+                continue
             scrape_county(county_id, county_name, catch_writer, lengths_writer, lakes_writer)
 
     print("\nAll counties complete.")
