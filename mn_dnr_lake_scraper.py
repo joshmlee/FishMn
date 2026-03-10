@@ -111,7 +111,7 @@ MN_COUNTIES = [
 def fetch_jsonp(url: str, params: dict) -> dict:
     """Fetch a JSONP endpoint and return parsed JSON."""
     params["callback"] = "cb"
-    response = requests.get(url, params=params, timeout=30)
+    response = requests.get(url, params=params, timeout=(10, 30))
     response.raise_for_status()
     text = response.text.strip()
     match = re.match(r"^\w+\((.*)\);?$", text, re.DOTALL)
