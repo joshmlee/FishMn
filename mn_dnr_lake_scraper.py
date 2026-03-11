@@ -120,13 +120,14 @@ def _do_request(url: str, params: dict) -> str:
 
 def fetch_jsonp(url: str, params: dict) -> dict:
     """Fetch a JSONP endpoint with a hard wall-clock timeout."""
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(_do_request, url, params)
-        try:
-            text = future.result(timeout=REQUEST_TIMEOUT)
-        except FuturesTimeoutError:
-            future.cancel()
-            raise TimeoutError(f"Request to {url} exceeded {REQUEST_TIMEOUT}s")
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(_do_request, url, params)
+    try:
+        text = future.result(timeout=REQUEST_TIMEOUT)
+    except FuturesTimeoutError:
+        executor.shutdown(wait=False)
+        raise TimeoutError(f"Request to {url} exceeded {REQUEST_TIMEOUT}s")
+    executor.shutdown(wait=False)
     match = re.match(r"^\w+\((.*)\);?$", text, re.DOTALL)
     if match:
         return json.loads(match.group(1))
