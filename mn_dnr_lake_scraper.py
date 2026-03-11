@@ -10,6 +10,9 @@ import time
 import csv
 import os
 import requests
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+
+REQUEST_TIMEOUT = 30  # seconds total wall-clock limit per request
 
 GAZETTEER_URL = "https://maps.dnr.state.mn.us/cgi-bin/gazetteer/gazetteer2.cgi"
 DETAIL_URL = "https://maps.dnr.state.mn.us/cgi-bin/lakefinder/detail.cgi"
@@ -108,12 +111,22 @@ MN_COUNTIES = [
 ]
 
 
-def fetch_jsonp(url: str, params: dict) -> dict:
-    """Fetch a JSONP endpoint and return parsed JSON."""
+def _do_request(url: str, params: dict) -> str:
     params["callback"] = "cb"
-    response = requests.get(url, params=params, timeout=(10, 30))
+    response = requests.get(url, params=params, timeout=(10, REQUEST_TIMEOUT))
     response.raise_for_status()
-    text = response.text.strip()
+    return response.text.strip()
+
+
+def fetch_jsonp(url: str, params: dict) -> dict:
+    """Fetch a JSONP endpoint with a hard wall-clock timeout."""
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_do_request, url, params)
+        try:
+            text = future.result(timeout=REQUEST_TIMEOUT)
+        except FuturesTimeoutError:
+            future.cancel()
+            raise TimeoutError(f"Request to {url} exceeded {REQUEST_TIMEOUT}s")
     match = re.match(r"^\w+\((.*)\);?$", text, re.DOTALL)
     if match:
         return json.loads(match.group(1))
