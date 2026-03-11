@@ -172,7 +172,19 @@ def flatten_length_row(dow: str, lake_name: str, county_name: str, survey: dict,
     return row
 
 
-def scrape_county(county_id: int, county_name: str, catch_writer, lengths_writer, lakes_writer):
+def load_processed_dows(path: str) -> set:
+    if not os.path.exists(path):
+        return set()
+    with open(path) as f:
+        return set(line.strip() for line in f if line.strip())
+
+
+def mark_dow_processed(path: str, dow: str):
+    with open(path, "a") as f:
+        f.write(dow + "\n")
+
+
+def scrape_county(county_id: int, county_name: str, catch_writer, lengths_writer, lakes_writer, processed_dows: set, processed_dows_path: str):
     safe_name = county_name.lower().replace(" ", "_").replace(".", "")
     done_marker = os.path.join(OUTPUT_DIR, f".done_{safe_name}")
 
@@ -190,38 +202,55 @@ def scrape_county(county_id: int, county_name: str, catch_writer, lengths_writer
     print(f"  Found {len(lakes)} lakes.")
 
     for lake in lakes:
-        lakes_writer.writerow({
-            "id": lake.get("id", ""),
-            "name": lake.get("name", ""),
-            "county": county_name,
-            "type": lake.get("type", ""),
-        })
+        if str(lake.get("id", "")) not in processed_dows:
+            lakes_writer.writerow({
+                "id": lake.get("id", ""),
+                "name": lake.get("name", ""),
+                "county": county_name,
+                "type": lake.get("type", ""),
+            })
 
     for i, lake in enumerate(lakes):
         dow = str(lake["id"])
         name = lake.get("name", "Unknown")
+
+        if dow in processed_dows:
+            print(f"  [{i+1}/{len(lakes)}] {name} (DOW {dow}) — skipped (already processed)")
+            continue
+
         print(f"  [{i+1}/{len(lakes)}] {name} (DOW {dow})")
 
         try:
             result = get_lake_surveys(dow)
+            surveys = result.get("surveys", [])
+            if not surveys:
+                mark_dow_processed(processed_dows_path, dow)
+                processed_dows.add(dow)
+                time.sleep(0.3)
+                continue
+
+            for survey in surveys:
+                for catch in survey.get("fishCatchSummaries", []):
+                    catch_writer.writerow(flatten_catch_summary(dow, name, county_name, survey, catch))
+
+                for species, lengths in survey.get("lengths", {}).items():
+                    if isinstance(lengths, dict) and lengths:
+                        lengths_writer.writerow(flatten_length_row(dow, name, county_name, survey, species, lengths))
+
         except Exception as e:
-            print(f"    WARNING: Failed to fetch surveys for {name}: {e}")
+            print(f"    WARNING: Failed to fetch surveys for {name} (DOW {dow}): {e} — writing placeholder")
+            catch_writer.writerow({
+                "dow_number": dow, "lake_name": name, "county": county_name,
+                "survey_id": "FETCH_ERROR", "survey_date": "", "survey_type": "",
+                "survey_sub_type": "", "species": "", "gear": "", "gear_count": "",
+                "total_catch": "", "cpue": "", "quartile_count_low": "",
+                "quartile_count_high": "", "total_weight": "", "average_weight": "",
+                "quartile_weight_low": "", "quartile_weight_high": "",
+            })
             time.sleep(1)
-            continue
 
-        surveys = result.get("surveys", [])
-        if not surveys:
-            time.sleep(0.3)
-            continue
-
-        for survey in surveys:
-            for catch in survey.get("fishCatchSummaries", []):
-                catch_writer.writerow(flatten_catch_summary(dow, name, county_name, survey, catch))
-
-            for species, lengths in survey.get("lengths", {}).items():
-                if isinstance(lengths, dict) and lengths:
-                    lengths_writer.writerow(flatten_length_row(dow, name, county_name, survey, species, lengths))
-
+        mark_dow_processed(processed_dows_path, dow)
+        processed_dows.add(dow)
         time.sleep(0.3)
 
     # Mark county as done so we can resume if interrupted
@@ -237,6 +266,10 @@ if __name__ == "__main__":
     end_id   = int(sys.argv[2]) if len(sys.argv) > 2 else 87
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    processed_dows_path = os.path.join(OUTPUT_DIR, ".processed_dows.txt")
+    processed_dows = load_processed_dows(processed_dows_path)
+    print(f"Resuming with {len(processed_dows)} already-processed lakes.")
 
     catch_path = os.path.join(OUTPUT_DIR, "all_counties_catch_summaries.csv")
     lengths_path = os.path.join(OUTPUT_DIR, "all_counties_length_distributions.csv")
@@ -275,7 +308,7 @@ if __name__ == "__main__":
         for county_id, county_name in MN_COUNTIES:
             if not (start_id <= county_id <= end_id):
                 continue
-            scrape_county(county_id, county_name, catch_writer, lengths_writer, lakes_writer)
+            scrape_county(county_id, county_name, catch_writer, lengths_writer, lakes_writer, processed_dows, processed_dows_path)
 
     print("\nAll counties complete.")
     print(f"  {catch_path}")
