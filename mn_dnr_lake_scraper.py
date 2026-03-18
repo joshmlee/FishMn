@@ -15,6 +15,7 @@ GAZETTEER_URL = "https://maps.dnr.state.mn.us/cgi-bin/gazetteer/gazetteer2.cgi"
 DETAIL_URL = "https://maps.dnr.state.mn.us/cgi-bin/lakefinder/detail.cgi"
 
 OUTPUT_DIR = "lake_survey_data"
+SKIP_FILE = os.path.join(OUTPUT_DIR, ".skip_dows")
 
 # All 87 MN counties, DNR ID = alphabetical position (1-87)
 MN_COUNTIES = [
@@ -172,7 +173,14 @@ def flatten_length_row(dow: str, lake_name: str, county_name: str, survey: dict,
     return row
 
 
-def scrape_county(county_id: int, county_name: str, catch_writer, lengths_writer, lakes_writer):
+def load_skip_dows() -> set:
+    if not os.path.exists(SKIP_FILE):
+        return set()
+    with open(SKIP_FILE) as f:
+        return {line.strip() for line in f if line.strip()}
+
+
+def scrape_county(county_id: int, county_name: str, catch_writer, lengths_writer, lakes_writer, skip_dows: set = None):
     safe_name = county_name.lower().replace(" ", "_").replace(".", "")
     done_marker = os.path.join(OUTPUT_DIR, f".done_{safe_name}")
 
@@ -200,6 +208,9 @@ def scrape_county(county_id: int, county_name: str, catch_writer, lengths_writer
     for i, lake in enumerate(lakes):
         dow = str(lake["id"])
         name = lake.get("name", "Unknown")
+        if skip_dows and dow in skip_dows:
+            print(f"  [{i+1}/{len(lakes)}] {name} (DOW {dow}) -- SKIPPED")
+            continue
         print(f"  [{i+1}/{len(lakes)}] {name} (DOW {dow})")
 
         try:
@@ -272,10 +283,14 @@ if __name__ == "__main__":
         if not lakes_exists:
             lakes_writer.writeheader()
 
+        skip_dows = load_skip_dows()
+        if skip_dows:
+            print(f"Skipping {len(skip_dows)} lake(s): {', '.join(sorted(skip_dows))}")
+
         for county_id, county_name in MN_COUNTIES:
             if not (start_id <= county_id <= end_id):
                 continue
-            scrape_county(county_id, county_name, catch_writer, lengths_writer, lakes_writer)
+            scrape_county(county_id, county_name, catch_writer, lengths_writer, lakes_writer, skip_dows)
 
     print("\nAll counties complete.")
     print(f"  {catch_path}")
