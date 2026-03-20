@@ -241,17 +241,21 @@ def scrape_county(county_id: int, county_name: str, catch_writer, lengths_writer
 
 
 if __name__ == "__main__":
-    import sys
-    # Optional args: start_id end_id (inclusive, 1-87)
-    # e.g. python mn_dnr_lake_scraper.py 11 15
-    start_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    end_id   = int(sys.argv[2]) if len(sys.argv) > 2 else 87
+    import sys, argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("start_id", nargs="?", type=int, default=1)
+    parser.add_argument("end_id",   nargs="?", type=int, default=87)
+    parser.add_argument("--worker", type=str, default="", help="Worker suffix for output files (e.g. '1')")
+    args = parser.parse_args()
+    start_id = args.start_id
+    end_id   = args.end_id
+    suffix   = f"_{args.worker}" if args.worker else ""
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    catch_path = os.path.join(OUTPUT_DIR, "all_counties_catch_summaries.csv")
-    lengths_path = os.path.join(OUTPUT_DIR, "all_counties_length_distributions.csv")
-    lakes_path = os.path.join(OUTPUT_DIR, "all_counties_lakes.csv")
+    catch_path = os.path.join(OUTPUT_DIR, f"all_counties_catch_summaries{suffix}.csv")
+    lengths_path = os.path.join(OUTPUT_DIR, f"all_counties_length_distributions{suffix}.csv")
+    lakes_path = os.path.join(OUTPUT_DIR, f"all_counties_lakes{suffix}.csv")
 
     catch_fields = [
         "dow_number", "lake_name", "county", "survey_id", "survey_date",
