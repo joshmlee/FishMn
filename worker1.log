@@ -1,0 +1,45 @@
+
+[17/87] Fetching Cottonwood County...
+  Found 35 lakes.
+  [1/35] Arnold's (DOW 17002700)
+  [2/35] Augusta (DOW 17003300)
+  [3/35] Bartsh (DOW 17001600)
+  [4/35] Bat (DOW 17001800)
+  [5/35] Bean (DOW 17005400)
+  [6/35] Bingham (DOW 17000700)
+  [7/35] Bingham Pond (DOW 17008600)
+  [8/35] Carey (DOW 17004900)
+  [9/35] Clear (DOW 17000800)
+  [10/35] Clear (DOW 17005700)
+  [11/35] Cottonwood (DOW 17002200)
+  [12/35] Double (DOW 17005600)
+  [13/35] Double (North Portion) (DOW 17005601)
+  [14/35] Double (South Portion) (DOW 17005602)
+  [15/35] Duck (DOW 17003800)
+  [16/35] Eagle (DOW 17002000)
+  [17/35] Harder (DOW 17003100)
+  [18/35] Hurricane (DOW 17003700)
+  [19/35] Long (DOW 17001900)
+  [20/35] Long (DOW 17004802)
+  [21/35] Maiden (DOW 17001500)
+  [22/35] Mountain (DOW 17000300)
+  [23/35] North Oaks (DOW 17004400)
+  [24/35] Oak Outlet (DOW 17007200)
+  [25/35] Round (DOW 17004801)
+  [26/35] Shoper-Bush Reservoir (DOW 17008500)
+  [27/35] South Clear (DOW 17004100)
+  [28/35] String (DOW 17002400)
+  [29/35] Summit (DOW 17007300)
+  [30/35] Talcot (DOW 17006000)
+  [31/35] Talcot Pond (DOW 17008300)
+  [32/35] Three (DOW 17001200)
+  [33/35] Warren (DOW 17002101)
+  [34/35] Warren Pond (DOW 17002102)
+  [35/35] Wolf (DOW 17001300)
+  Done with Cottonwood County.
+
+All counties complete.
+  lake_survey_data/all_counties_catch_summaries_1.csv
+  lake_survey_data/all_counties_length_distributions_1.csv
+  lake_survey_data/all_counties_lakes_1.csv
+DONE
