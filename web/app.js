@@ -1,16 +1,18 @@
 // ── State ──
 let allLakes = [];
 let speciesNames = {};
-let surveyCache = {};       // county -> survey data (lazy loaded)
+let surveyCache = {};   // county -> survey data (lazy loaded)
 let currentCounty = "";
+let currentSpecies = "";
+let currentSort = "cpue";
 let currentLake = null;
-let currentSpecies = null;
 
 // ── Boot ──
 async function init() {
-  const [lakes, counties, species] = await Promise.all([
+  const [lakes, counties, speciesList, species] = await Promise.all([
     fetchJSON("data/lakes.json"),
     fetchJSON("data/counties.json"),
+    fetchJSON("data/species_list.json"),
     fetchJSON("data/species_names.json"),
   ]);
 
@@ -18,10 +20,13 @@ async function init() {
   speciesNames = species;
 
   populateCountyDropdown(counties);
-  renderLakeList(allLakes);
+  populateSpeciesDropdown(speciesList);
+  renderLakeList(allLakes, null);
 
-  document.getElementById("county-select").addEventListener("change", onCountyChange);
-  document.getElementById("lake-search").addEventListener("input", onSearchInput);
+  document.getElementById("county-select").addEventListener("change", onFilterChange);
+  document.getElementById("species-select").addEventListener("change", onFilterChange);
+  document.getElementById("sort-select").addEventListener("change", onSortChange);
+  document.getElementById("lake-search").addEventListener("input", onFilterChange);
 }
 
 // ── Data fetching ──
@@ -39,11 +44,24 @@ async function loadCountySurveys(county) {
     surveyCache[county] = data;
     return data;
   } catch {
+    surveyCache[county] = {};
     return {};
   }
 }
 
-// ── UI: County dropdown ──
+// Load all counties needed for "All Minnesota" ranking, with progress callback
+async function loadAllCountySurveys(counties, onProgress) {
+  let done = 0;
+  await Promise.all(
+    counties.map(async (county) => {
+      await loadCountySurveys(county);
+      done++;
+      onProgress(done, counties.length);
+    })
+  );
+}
+
+// ── UI: Dropdowns ──
 function populateCountyDropdown(counties) {
   const sel = document.getElementById("county-select");
   counties.forEach((c) => {
@@ -54,38 +72,61 @@ function populateCountyDropdown(counties) {
   });
 }
 
-// ── UI: Lake list ──
-function renderLakeList(lakes) {
-  const ul = document.getElementById("lake-list");
-  const noResults = document.getElementById("no-results");
-  const count = document.getElementById("results-count");
+function populateSpeciesDropdown(speciesList) {
+  const sel = document.getElementById("species-select");
+  speciesList.forEach(({ code, name }) => {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+}
 
-  ul.innerHTML = "";
+// ── Event handlers ──
+async function onFilterChange() {
+  currentCounty = document.getElementById("county-select").value;
+  currentSpecies = document.getElementById("species-select").value;
 
-  if (lakes.length === 0) {
-    noResults.classList.remove("hidden");
-    count.textContent = "";
+  const sortGroup = document.getElementById("sort-group");
+  sortGroup.style.display = currentSpecies ? "" : "none";
+
+  currentLake = null;
+  showDetailPlaceholder();
+
+  const lakes = filteredLakes();
+
+  if (!currentSpecies) {
+    renderLakeList(lakes, null);
     return;
   }
 
-  noResults.classList.add("hidden");
-  count.textContent = `${lakes.length.toLocaleString()} lake${lakes.length !== 1 ? "s" : ""}`;
+  // Need survey data to rank — figure out which counties to load
+  const neededCounties = currentCounty
+    ? [currentCounty]
+    : [...new Set(lakes.map((l) => l.county))];
 
-  const frag = document.createDocumentFragment();
-  lakes.forEach((lake) => {
-    const li = document.createElement("li");
-    li.dataset.id = lake.id;
-    li.dataset.county = lake.county;
-    li.innerHTML = `
-      <div class="lake-name">${escHtml(lake.name)}</div>
-      <div class="lake-county">${escHtml(lake.county)} County</div>
-    `;
-    li.addEventListener("click", () => selectLake(lake, li));
-    frag.appendChild(li);
-  });
-  ul.appendChild(frag);
+  const alreadyCached = neededCounties.every((c) => surveyCache[c]);
+  if (!alreadyCached) {
+    showLoadingBar(true);
+    await loadAllCountySurveys(neededCounties, (done, total) => {
+      updateLoadingBar(done, total);
+    });
+    showLoadingBar(false);
+  }
+
+  const ranked = rankLakes(lakes, currentSpecies, currentSort);
+  renderLakeList(ranked.lakes, ranked.metricByDow);
 }
 
+function onSortChange() {
+  currentSort = document.getElementById("sort-select").value;
+  if (!currentSpecies) return;
+  const lakes = filteredLakes();
+  const ranked = rankLakes(lakes, currentSpecies, currentSort);
+  renderLakeList(ranked.lakes, ranked.metricByDow);
+}
+
+// ── Filtering & ranking ──
 function filteredLakes() {
   const search = document.getElementById("lake-search").value.trim().toLowerCase();
   return allLakes.filter((l) => {
@@ -95,34 +136,112 @@ function filteredLakes() {
   });
 }
 
-// ── Event handlers ──
-function onCountyChange(e) {
-  currentCounty = e.target.value;
-  currentLake = null;
-  currentSpecies = null;
-  renderLakeList(filteredLakes());
-  showDetailPlaceholder();
+// For each lake, find the most recent survey row for the chosen species,
+// then sort descending by the chosen metric. Returns only lakes that have data.
+function rankLakes(lakes, speciesCode, sortField) {
+  const metricByDow = {};
+
+  for (const lake of lakes) {
+    const countyData = surveyCache[lake.county] || {};
+    const rows = (countyData[lake.id] || []).filter(
+      (r) => r.species === speciesCode
+    );
+    if (rows.length === 0) continue;
+
+    // Most recent survey for this species
+    const latest = rows.reduce((best, r) =>
+      r.date > best.date ? r : best
+    );
+
+    const val = latest[sortField];
+    if (val == null) continue;
+
+    metricByDow[lake.id] = { value: val, date: latest.date };
+  }
+
+  const ranked = lakes
+    .filter((l) => metricByDow[l.id] != null)
+    .sort((a, b) => metricByDow[b.id].value - metricByDow[a.id].value);
+
+  return { lakes: ranked, metricByDow };
 }
 
-function onSearchInput() {
-  renderLakeList(filteredLakes());
+// ── UI: Lake list ──
+function renderLakeList(lakes, metricByDow) {
+  const ul = document.getElementById("lake-list");
+  const noResults = document.getElementById("no-results");
+  const count = document.getElementById("results-count");
+
+  ul.innerHTML = "";
+
+  const total = lakes.length;
+  const label = metricByDow
+    ? `${total.toLocaleString()} lake${total !== 1 ? "s" : ""} with data`
+    : `${total.toLocaleString()} lake${total !== 1 ? "s" : ""}`;
+
+  if (total === 0) {
+    noResults.classList.remove("hidden");
+    count.textContent = "";
+    return;
+  }
+
+  noResults.classList.add("hidden");
+  count.textContent = label;
+
+  const sortLabel = {
+    cpue: "CPUE",
+    total_catch: "Catch",
+    avg_weight: "Avg wt",
+  }[currentSort] || "";
+
+  const frag = document.createDocumentFragment();
+  lakes.forEach((lake, i) => {
+    const li = document.createElement("li");
+    li.dataset.id = lake.id;
+
+    const metric = metricByDow ? metricByDow[lake.id] : null;
+    const rankBadge = metricByDow
+      ? `<span class="rank-badge">#${i + 1}</span>`
+      : "";
+    const metricBadge = metric
+      ? `<span class="metric-badge">${sortLabel}: ${formatMetric(metric.value, currentSort)}</span>`
+      : "";
+    const dateBadge = metric
+      ? `<span class="survey-date">Survey: ${metric.date}</span>`
+      : "";
+
+    li.innerHTML = `
+      <div class="lake-row-top">
+        ${rankBadge}
+        <span class="lake-name">${escHtml(lake.name)}</span>
+        ${metricBadge}
+      </div>
+      <div class="lake-row-bottom">
+        <span class="lake-county">${escHtml(lake.county)} County</span>
+        ${dateBadge}
+      </div>
+    `;
+    li.addEventListener("click", () => selectLake(lake, li));
+    frag.appendChild(li);
+  });
+  ul.appendChild(frag);
+}
+
+function formatMetric(val, field) {
+  if (val == null) return "—";
+  if (field === "total_catch") return val.toLocaleString();
+  return val.toFixed(2);
 }
 
 // ── Lake selection ──
 async function selectLake(lake, li) {
-  // Highlight selected
   document.querySelectorAll("#lake-list li").forEach((el) => el.classList.remove("active"));
   li.classList.add("active");
-
   currentLake = lake;
-  currentSpecies = null;
 
   showDetailLoading(lake);
-
   const surveys = await loadCountySurveys(lake.county);
-  const lakeSurveys = surveys[lake.id] || [];
-
-  renderDetail(lake, lakeSurveys);
+  renderDetail(lake, surveys[lake.id] || []);
 }
 
 // ── Detail panel ──
@@ -146,10 +265,9 @@ function showDetailLoading(lake) {
 
 function renderDetail(lake, surveys) {
   const panel = document.getElementById("detail-panel");
-
   const mapsUrl = googleMapsUrl(lake);
 
-  // Group surveys by species, collect unique species
+  // Group by species
   const bySpecies = {};
   surveys.forEach((s) => {
     if (!bySpecies[s.species]) bySpecies[s.species] = [];
@@ -160,9 +278,11 @@ function renderDetail(lake, surveys) {
     speciesLabel(a).localeCompare(speciesLabel(b))
   );
 
-  // Default to first species (alphabetical by common name)
-  const defaultSpecies = speciesList[0] || null;
-  currentSpecies = defaultSpecies;
+  // Default to the filtered species if active, else first alphabetically
+  const defaultSpecies =
+    (currentSpecies && bySpecies[currentSpecies])
+      ? currentSpecies
+      : (speciesList[0] || null);
 
   panel.innerHTML = `
     <div class="detail-header">
@@ -171,8 +291,7 @@ function renderDetail(lake, surveys) {
         <div class="meta">${escHtml(lake.county)} County &bull; DOW #${lake.id}</div>
       </div>
       <a class="maps-link" href="${mapsUrl}" target="_blank" rel="noopener">
-        ${mapIcon()}
-        View on Google Maps
+        ${mapIcon()} View on Google Maps
       </a>
     </div>
 
@@ -200,16 +319,13 @@ function renderDetail(lake, surveys) {
       if (!btn) return;
       document.querySelectorAll(".species-tab").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      currentSpecies = btn.dataset.species;
-      renderSurveyTable(bySpecies[currentSpecies] || []);
+      renderSurveyTable(bySpecies[btn.dataset.species] || []);
     });
   }
 }
 
 function renderSurveyTable(rows) {
-  // Sort by date descending
   const sorted = [...rows].sort((a, b) => b.date.localeCompare(a.date));
-
   const container = document.getElementById("survey-table-container");
   if (!container) return;
 
@@ -251,6 +367,18 @@ function renderSurveyTable(rows) {
   `;
 }
 
+// ── Loading bar ──
+function showLoadingBar(visible) {
+  document.getElementById("loading-bar").classList.toggle("hidden", !visible);
+}
+
+function updateLoadingBar(done, total) {
+  const pct = Math.round((done / total) * 100);
+  document.querySelector(".loading-bar-inner").style.width = `${pct}%`;
+  document.getElementById("loading-label").textContent =
+    `Loading survey data… ${done}/${total} counties`;
+}
+
 // ── Helpers ──
 function speciesLabel(code) {
   return speciesNames[code] || code;
@@ -269,10 +397,8 @@ function mapIcon() {
 
 function escHtml(str) {
   return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function escAttr(str) {

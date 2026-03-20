@@ -23,11 +23,31 @@
         </select>
       </div>
       <div class="filter-group">
+        <label for="species-select">Species</label>
+        <select id="species-select">
+          <option value="">All species</option>
+        </select>
+      </div>
+      <div class="filter-group" id="sort-group" style="display:none">
+        <label for="sort-select">Rank by</label>
+        <select id="sort-select">
+          <option value="cpue">CPUE (catch per unit effort)</option>
+          <option value="total_catch">Total Catch</option>
+          <option value="avg_weight">Avg Weight (lbs)</option>
+        </select>
+      </div>
+      <div class="filter-group">
         <label for="lake-search">Search lake name</label>
         <input type="text" id="lake-search" placeholder="e.g. Mille Lacs" />
       </div>
       <div class="results-count" id="results-count"></div>
     </section>
+
+    <!-- Loading bar shown while fetching county survey files -->
+    <div id="loading-bar" class="loading-bar hidden">
+      <div class="loading-bar-inner"></div>
+      <span id="loading-label">Loading survey data…</span>
+    </div>
 
     <!-- Content area: lake list + detail panel side by side -->
     <div class="content">

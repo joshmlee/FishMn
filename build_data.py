@@ -229,8 +229,8 @@ def main():
             json.dump(data, f, separators=(",", ":"))
     print(f"  {len(surveys_by_lake)} lakes with survey data written across {len(county_surveys)} county files")
 
-    # --- Species names ---
-    # Also collect any codes from the data not already in our lookup
+    # --- Species names + surveyed species list ---
+    # Collect codes that actually appear in the survey data
     all_codes = set()
     for rows in surveys_by_lake.values():
         for r in rows:
@@ -242,6 +242,15 @@ def main():
     with open(f"{OUTPUT_DIR}/species_names.json", "w") as f:
         json.dump(SPECIES_NAMES, f, indent=2, sort_keys=True)
     print(f"  {len(SPECIES_NAMES)} species name mappings written")
+
+    # species_list.json — only codes that appear in surveys, sorted by common name
+    species_list = sorted(
+        [{"code": c, "name": SPECIES_NAMES[c]} for c in all_codes],
+        key=lambda x: x["name"]
+    )
+    with open(f"{OUTPUT_DIR}/species_list.json", "w") as f:
+        json.dump(species_list, f, separators=(",", ":"))
+    print(f"  {len(species_list)} surveyed species written to species_list.json")
 
     print(f"\nDone. Files written to {OUTPUT_DIR}/")
 
