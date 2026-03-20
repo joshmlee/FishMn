@@ -1,4 +1,6 @@
 # Scraper output (in progress)
 scraper_output.log
+watchdog.log
 lake_survey_data/all_counties_*.csv
 lake_survey_data/.done_*
+lake_survey_data/.skip_dows
