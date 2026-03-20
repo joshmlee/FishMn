@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minnesota Lake Fish Surveys</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <h1>Minnesota Lake Fish Surveys</h1>
+    <p class="subtitle">Browse MN DNR survey data for lakes across Minnesota</p>
+  </header>
+
+  <main>
+    <!-- Filter bar -->
+    <section class="filters">
+      <div class="filter-group">
+        <label for="county-select">County</label>
+        <select id="county-select">
+          <option value="">All Minnesota</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="lake-search">Search lake name</label>
+        <input type="text" id="lake-search" placeholder="e.g. Mille Lacs" />
+      </div>
+      <div class="results-count" id="results-count"></div>
+    </section>
+
+    <!-- Content area: lake list + detail panel side by side -->
+    <div class="content">
+      <aside class="lake-list-panel">
+        <ul id="lake-list"></ul>
+        <p id="no-results" class="hidden">No lakes found.</p>
+      </aside>
+
+      <section class="detail-panel" id="detail-panel">
+        <div class="detail-placeholder">
+          <p>Select a lake to see its fish survey data.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
