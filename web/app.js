@@ -174,15 +174,15 @@ function rankLakes(lakes, speciesCode, sortField, dateYears = 0) {
     const val = latest[sortField];
     if (val == null) continue;
 
-    // Trend: compare latest CPUE to previous survey's CPUE
+    // Trend: compare latest value to previous survey's value for the same field
     let trend = null;
     if (surveys.length >= 2) {
-      const prevCpue = surveys[1].cpue;
-      const currCpue = latest.cpue;
-      if (prevCpue != null && currCpue != null && prevCpue !== 0) {
+      const prevVal = surveys[1][sortField];
+      const currVal = latest[sortField];
+      if (prevVal != null && currVal != null && prevVal !== 0) {
         trend = {
-          direction: currCpue > prevCpue ? "up" : currCpue < prevCpue ? "down" : "same",
-          prevCpue,
+          direction: currVal > prevVal ? "up" : currVal < prevVal ? "down" : "same",
+          prevVal,
           prevDate: surveys[1].date,
         };
       }
@@ -243,7 +243,7 @@ function renderLakeList(lakes, metricByDow) {
       ? `<span class="survey-date">Survey: ${metric.date}</span>`
       : "";
     const trendBadge = metric?.trend
-      ? trendBadgeHtml(metric.trend)
+      ? trendBadgeHtml(metric.trend, currentSort)
       : "";
 
     li.innerHTML = `
@@ -272,11 +272,12 @@ function formatMetric(val, field) {
   return val.toFixed(2);
 }
 
-function trendBadgeHtml(trend) {
+function trendBadgeHtml(trend, sortField) {
   const arrow = trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "→";
   const cls = trend.direction === "up" ? "trend-up" : trend.direction === "down" ? "trend-down" : "trend-same";
   const year = trend.prevDate.slice(0, 4);
-  return `<span class="trend-badge ${cls}" title="Previous survey CPUE: ${trend.prevCpue.toFixed(2)} (${year})">${arrow} from ${trend.prevCpue.toFixed(2)} (${year})</span>`;
+  const formatted = formatMetric(trend.prevVal, sortField);
+  return `<span class="trend-badge ${cls}">${arrow} from ${formatted} (${year})</span>`;
 }
 
 // ── Lake selection ──
