@@ -251,12 +251,12 @@ function renderLakeList(lakes, metricByDow) {
         ${rankBadge}
         <span class="lake-name">${escHtml(lake.name)}</span>
         ${metricBadge}
-        ${trendBadge}
       </div>
       <div class="lake-row-bottom">
         <span class="lake-county">${escHtml(lake.county)} County</span>
         ${dateBadge}
       </div>
+      ${trendBadge ? `<div class="lake-row-trend">${trendBadge}</div>` : ""}
     `;
     li.addEventListener("click", () => selectLake(lake, li));
     frag.appendChild(li);
