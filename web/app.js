@@ -191,7 +191,7 @@ function renderLakeList(lakes, metricByDow) {
   const sortLabel = {
     cpue: "CPUE",
     total_catch: "Catch",
-    avg_weight: "Avg wt",
+    avg_length: "Avg size",
   }[currentSort] || "";
 
   const frag = document.createDocumentFragment();
@@ -230,6 +230,7 @@ function renderLakeList(lakes, metricByDow) {
 function formatMetric(val, field) {
   if (val == null) return "—";
   if (field === "total_catch") return val.toLocaleString();
+  if (field === "avg_length") return `${val.toFixed(1)}"`;
   return val.toFixed(2);
 }
 
