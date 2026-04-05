@@ -134,6 +134,9 @@ header .subtitle { margin-top: 0.25rem; opacity: 0.8; font-size: 0.9rem; }
 }
 #lake-list li.active .survey-date { color: rgba(255,255,255,0.55); }
 
+.lake-row-trend {
+  margin-top: 4px;
+}
 .trend-badge {
   font-size: 0.75rem;
   font-weight: 600;
