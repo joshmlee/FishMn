@@ -235,6 +235,7 @@ def main():
                 "gear_count": int(row["gear_count"]) if row["gear_count"].isdigit() else None,
                 "total_catch": int(row["total_catch"]) if row["total_catch"].isdigit() else None,
                 "cpue": parse_float(row["cpue"]),
+                "avg_weight": parse_float(row["average_weight"]) if row["average_weight"] not in (".", "") else None,
                 "avg_length": ls.get("avg_length"),
                 "max_length": ls.get("max_length"),
             })
