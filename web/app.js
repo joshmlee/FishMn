@@ -136,19 +136,19 @@ function filteredLakes() {
   });
 }
 
-// For each lake, find the most recent survey row for the chosen species,
-// then sort descending by the chosen metric. Returns only lakes that have data.
+// For each lake, find the most recent Standard gill nets survey row for the
+// chosen species, then sort descending by the chosen metric.
 function rankLakes(lakes, speciesCode, sortField) {
   const metricByDow = {};
 
   for (const lake of lakes) {
     const countyData = surveyCache[lake.county] || {};
     const rows = (countyData[lake.id] || []).filter(
-      (r) => r.species === speciesCode
+      (r) => r.species === speciesCode && r.gear === "Standard gill nets"
     );
     if (rows.length === 0) continue;
 
-    // Most recent survey for this species
+    // Most recent standard gill nets survey for this species
     const latest = rows.reduce((best, r) =>
       r.date > best.date ? r : best
     );
@@ -191,7 +191,7 @@ function renderLakeList(lakes, metricByDow) {
   const sortLabel = {
     cpue: "CPUE",
     total_catch: "Catch",
-    avg_weight: "Avg wt",
+    avg_length: "Avg size",
   }[currentSort] || "";
 
   const frag = document.createDocumentFragment();
@@ -230,6 +230,7 @@ function renderLakeList(lakes, metricByDow) {
 function formatMetric(val, field) {
   if (val == null) return "—";
   if (field === "total_catch") return val.toLocaleString();
+  if (field === "avg_length") return `${val.toFixed(1)}"`;
   return val.toFixed(2);
 }
 
@@ -274,9 +275,9 @@ function renderDetail(lake, surveys) {
     bySpecies[s.species].push(s);
   });
 
-  const speciesList = Object.keys(bySpecies).sort((a, b) =>
-    speciesLabel(a).localeCompare(speciesLabel(b))
-  );
+  const speciesList = Object.keys(bySpecies)
+    .filter((sp) => speciesLabel(sp) !== sp)
+    .sort((a, b) => speciesLabel(a).localeCompare(speciesLabel(b)));
 
   // Default to the filtered species if active, else first alphabetically
   const defaultSpecies =
@@ -345,8 +346,8 @@ function renderSurveyTable(rows) {
             <th>Gear</th>
             <th>Total Catch</th>
             <th>CPUE</th>
-            <th>Avg Weight (lbs)</th>
-            <th>Total Weight (lbs)</th>
+            <th>Avg Size (in)</th>
+            <th>Largest (in)</th>
           </tr>
         </thead>
         <tbody>
@@ -357,8 +358,8 @@ function renderSurveyTable(rows) {
               <td>${escHtml(r.gear || "—")}</td>
               <td>${r.total_catch ?? "—"}</td>
               <td>${r.cpue != null ? r.cpue.toFixed(2) : "—"}</td>
-              <td>${r.avg_weight != null ? r.avg_weight.toFixed(2) : "—"}</td>
-              <td>${r.total_weight != null ? r.total_weight.toFixed(1) : "—"}</td>
+              <td>${r.avg_length != null ? r.avg_length.toFixed(1) : "—"}</td>
+              <td>${r.max_length != null ? r.max_length : "—"}</td>
             </tr>
           `).join("")}
         </tbody>
