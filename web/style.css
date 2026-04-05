@@ -170,6 +170,13 @@ header .subtitle { margin-top: 0.25rem; opacity: 0.8; font-size: 0.9rem; }
 .detail-header h2 { font-size: 1.4rem; color: #1a202c; }
 .detail-header .meta { font-size: 0.85rem; color: #718096; margin-top: 0.25rem; }
 
+.detail-links {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
 .maps-link {
   display: inline-flex;
   align-items: center;
