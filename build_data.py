@@ -14,7 +14,7 @@ import os
 from collections import defaultdict
 
 INPUT_DIR = "lake_survey_data"
-OUTPUT_DIR = "web/data"
+OUTPUT_DIR = "docs/data"
 
 # Common name lookup for species codes used in MN DNR surveys
 SPECIES_NAMES = {
