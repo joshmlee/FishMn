@@ -134,6 +134,18 @@ header .subtitle { margin-top: 0.25rem; opacity: 0.8; font-size: 0.9rem; }
 }
 #lake-list li.active .survey-date { color: rgba(255,255,255,0.55); }
 
+.trend-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.trend-up   { background: #c6f6d5; color: #276749; }
+.trend-down { background: #fed7d7; color: #9b2c2c; }
+.trend-same { background: #e2e8f0; color: #4a5568; }
+#lake-list li.active .trend-badge { opacity: 0.85; }
+
 #no-results {
   padding: 2rem 1rem;
   text-align: center;

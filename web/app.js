@@ -5,6 +5,7 @@ let surveyCache = {};   // county -> survey data (lazy loaded)
 let currentCounty = "";
 let currentSpecies = "";
 let currentSort = "cpue";
+let currentDateYears = 0;  // 0 = any date
 let currentLake = null;
 
 // ── Boot ──
@@ -26,6 +27,7 @@ async function init() {
   document.getElementById("county-select").addEventListener("change", onFilterChange);
   document.getElementById("species-select").addEventListener("change", onFilterChange);
   document.getElementById("sort-select").addEventListener("change", onSortChange);
+  document.getElementById("date-select").addEventListener("change", onSortChange);
   document.getElementById("lake-search").addEventListener("input", onFilterChange);
 }
 
@@ -88,7 +90,9 @@ async function onFilterChange() {
   currentSpecies = document.getElementById("species-select").value;
 
   const sortGroup = document.getElementById("sort-group");
+  const dateGroup = document.getElementById("date-group");
   sortGroup.style.display = currentSpecies ? "" : "none";
+  dateGroup.style.display = currentSpecies ? "" : "none";
 
   currentLake = null;
   showDetailPlaceholder();
@@ -114,15 +118,16 @@ async function onFilterChange() {
     showLoadingBar(false);
   }
 
-  const ranked = rankLakes(lakes, currentSpecies, currentSort);
+  const ranked = rankLakes(lakes, currentSpecies, currentSort, currentDateYears);
   renderLakeList(ranked.lakes, ranked.metricByDow);
 }
 
 function onSortChange() {
   currentSort = document.getElementById("sort-select").value;
+  currentDateYears = parseInt(document.getElementById("date-select").value, 10);
   if (!currentSpecies) return;
   const lakes = filteredLakes();
-  const ranked = rankLakes(lakes, currentSpecies, currentSort);
+  const ranked = rankLakes(lakes, currentSpecies, currentSort, currentDateYears);
   renderLakeList(ranked.lakes, ranked.metricByDow);
 }
 
@@ -138,25 +143,52 @@ function filteredLakes() {
 
 // For each lake, find the most recent Standard gill nets survey row for the
 // chosen species, then sort descending by the chosen metric.
-function rankLakes(lakes, speciesCode, sortField) {
+// dateYears: if > 0, only consider surveys from within the last N years.
+function rankLakes(lakes, speciesCode, sortField, dateYears = 0) {
+  const cutoff = dateYears > 0
+    ? new Date(new Date().getFullYear() - dateYears, 0, 1).toISOString().slice(0, 10)
+    : null;
+
   const metricByDow = {};
 
   for (const lake of lakes) {
     const countyData = surveyCache[lake.county] || {};
-    const rows = (countyData[lake.id] || []).filter(
+    let rows = (countyData[lake.id] || []).filter(
       (r) => r.species === speciesCode && r.gear === "Standard gill nets"
     );
+    if (cutoff) rows = rows.filter((r) => r.date >= cutoff);
     if (rows.length === 0) continue;
 
-    // Most recent standard gill nets survey for this species
-    const latest = rows.reduce((best, r) =>
-      r.date > best.date ? r : best
-    );
+    // Sort by date descending
+    const sorted = [...rows].sort((a, b) => b.date.localeCompare(a.date));
 
+    // Deduplicate by survey_id to get distinct surveys (a survey can have multiple rows per gear)
+    const seen = new Set();
+    const surveys = sorted.filter((r) => {
+      if (seen.has(r.survey_id)) return false;
+      seen.add(r.survey_id);
+      return true;
+    });
+
+    const latest = surveys[0];
     const val = latest[sortField];
     if (val == null) continue;
 
-    metricByDow[lake.id] = { value: val, date: latest.date };
+    // Trend: compare latest CPUE to previous survey's CPUE
+    let trend = null;
+    if (surveys.length >= 2) {
+      const prevCpue = surveys[1].cpue;
+      const currCpue = latest.cpue;
+      if (prevCpue != null && currCpue != null && prevCpue !== 0) {
+        trend = {
+          direction: currCpue > prevCpue ? "up" : currCpue < prevCpue ? "down" : "same",
+          prevCpue,
+          prevDate: surveys[1].date,
+        };
+      }
+    }
+
+    metricByDow[lake.id] = { value: val, date: latest.date, trend };
   }
 
   const ranked = lakes
@@ -192,6 +224,7 @@ function renderLakeList(lakes, metricByDow) {
     cpue: "CPUE",
     total_catch: "Catch",
     avg_length: "Avg size",
+    avg_weight: "Avg weight",
   }[currentSort] || "";
 
   const frag = document.createDocumentFragment();
@@ -209,12 +242,16 @@ function renderLakeList(lakes, metricByDow) {
     const dateBadge = metric
       ? `<span class="survey-date">Survey: ${metric.date}</span>`
       : "";
+    const trendBadge = metric?.trend
+      ? trendBadgeHtml(metric.trend)
+      : "";
 
     li.innerHTML = `
       <div class="lake-row-top">
         ${rankBadge}
         <span class="lake-name">${escHtml(lake.name)}</span>
         ${metricBadge}
+        ${trendBadge}
       </div>
       <div class="lake-row-bottom">
         <span class="lake-county">${escHtml(lake.county)} County</span>
@@ -231,7 +268,15 @@ function formatMetric(val, field) {
   if (val == null) return "—";
   if (field === "total_catch") return val.toLocaleString();
   if (field === "avg_length") return `${val.toFixed(1)}"`;
+  if (field === "avg_weight") return `${val.toFixed(2)} lbs`;
   return val.toFixed(2);
+}
+
+function trendBadgeHtml(trend) {
+  const arrow = trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "→";
+  const cls = trend.direction === "up" ? "trend-up" : trend.direction === "down" ? "trend-down" : "trend-same";
+  const year = trend.prevDate.slice(0, 4);
+  return `<span class="trend-badge ${cls}" title="Previous survey CPUE: ${trend.prevCpue.toFixed(2)} (${year})">${arrow} from ${trend.prevCpue.toFixed(2)} (${year})</span>`;
 }
 
 // ── Lake selection ──
@@ -351,6 +396,7 @@ function renderSurveyTable(rows) {
             <th>Gear</th>
             <th>Total Catch</th>
             <th>CPUE</th>
+            <th>Avg Weight (lbs)</th>
             <th>Avg Size (in)</th>
             <th>Largest (in)</th>
           </tr>
@@ -363,6 +409,7 @@ function renderSurveyTable(rows) {
               <td>${escHtml(r.gear || "—")}</td>
               <td>${r.total_catch ?? "—"}</td>
               <td>${r.cpue != null ? r.cpue.toFixed(2) : "—"}</td>
+              <td>${r.avg_weight != null ? r.avg_weight.toFixed(2) : "—"}</td>
               <td>${r.avg_length != null ? r.avg_length.toFixed(1) : "—"}</td>
               <td>${r.max_length != null ? r.max_length : "—"}</td>
             </tr>
