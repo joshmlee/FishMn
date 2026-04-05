@@ -165,6 +165,22 @@ def parse_float(val):
     except (ValueError, TypeError):
         return None
 
+def compute_length_stats(fish_count_json):
+    """Parse [[length, count], ...] and return avg and max length in inches."""
+    import ast
+    try:
+        pairs = ast.literal_eval(fish_count_json)
+    except Exception:
+        return None, None
+    if not pairs:
+        return None, None
+    total_fish = sum(c for _, c in pairs)
+    if total_fish == 0:
+        return None, None
+    avg = sum(l * c for l, c in pairs) / total_fish
+    max_len = max(l for l, _ in pairs)
+    return round(avg, 1), max_len
+
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -191,11 +207,25 @@ def main():
         json.dump(sorted_counties, f, separators=(",", ":"))
     print(f"  {len(sorted_counties)} counties written")
 
+    # --- Length distributions: build (dow, survey_id, species) -> {avg_length, max_length} ---
+    print("Processing length distributions...")
+    length_stats = {}
+    with open(f"{INPUT_DIR}/all_counties_length_distributions.csv", newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            avg_len, max_len = compute_length_stats(row["fishCount"])
+            if avg_len is not None:
+                length_stats[(row["dow_number"], row["survey_id"], row["species"])] = {
+                    "avg_length": avg_len,
+                    "max_length": max_len,
+                }
+    print(f"  {len(length_stats)} length stat records loaded")
+
     # --- Catch Summaries (keyed by dow_number) ---
     print("Processing catch summaries...")
     surveys_by_lake = defaultdict(list)
     with open(f"{INPUT_DIR}/all_counties_catch_summaries.csv", newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
+            ls = length_stats.get((row["dow_number"], row["survey_id"], row["species"]), {})
             surveys_by_lake[row["dow_number"]].append({
                 "survey_id": row["survey_id"],
                 "date": row["survey_date"],
@@ -205,8 +235,8 @@ def main():
                 "gear_count": int(row["gear_count"]) if row["gear_count"].isdigit() else None,
                 "total_catch": int(row["total_catch"]) if row["total_catch"].isdigit() else None,
                 "cpue": parse_float(row["cpue"]),
-                "avg_weight": parse_float(row["average_weight"]),
-                "total_weight": parse_float(row["total_weight"]),
+                "avg_length": ls.get("avg_length"),
+                "max_length": ls.get("max_length"),
             })
 
     # Write one surveys_<county>.json per county (avoids loading 54MB at once)
@@ -243,9 +273,10 @@ def main():
         json.dump(SPECIES_NAMES, f, indent=2, sort_keys=True)
     print(f"  {len(SPECIES_NAMES)} species name mappings written")
 
-    # species_list.json — only codes that appear in surveys, sorted by common name
+    # species_list.json — only codes with known common names (exclude 3-letter fallbacks)
     species_list = sorted(
-        [{"code": c, "name": SPECIES_NAMES[c]} for c in all_codes],
+        [{"code": c, "name": SPECIES_NAMES[c]} for c in all_codes
+         if SPECIES_NAMES.get(c, c) != c],  # skip entries where name == code (unknown)
         key=lambda x: x["name"]
     )
     with open(f"{OUTPUT_DIR}/species_list.json", "w") as f:
