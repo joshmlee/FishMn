@@ -302,34 +302,87 @@ tbody tr:hover td { background: #f7fafc; }
 
 /* ── Info bar ── */
 .info-bar {
-  background: #ebf4ff;
-  border-bottom: 1px solid #bee3f8;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
   padding: 0 2rem;
 }
-.info-bar details { padding: 0.75rem 0; }
+.info-bar details { padding: 0.6rem 0; }
 .info-bar summary {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  color: #1a4f8a;
+  color: #4a5568;
   cursor: pointer;
   user-select: none;
   list-style: none;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
-.info-bar summary::before { content: "▶"; font-size: 0.65rem; transition: transform 0.15s; }
+.info-bar summary::before {
+  content: "▶";
+  font-size: 0.6rem;
+  color: #a0aec0;
+  transition: transform 0.15s;
+}
 .info-bar details[open] summary::before { transform: rotate(90deg); }
+.info-bar summary span { color: #4a5568; }
+
 .info-content {
   display: flex;
-  gap: 2rem;
-  flex-wrap: wrap;
-  padding: 1rem 0 0.5rem;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1rem 0 1.25rem;
 }
-.info-block { flex: 1; min-width: 260px; }
-.info-block h3 { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #1a4f8a; margin-bottom: 0.5rem; }
-.info-block p { font-size: 0.85rem; color: #4a5568; line-height: 1.6; margin-bottom: 0.5rem; }
-.info-block p:last-child { margin-bottom: 0; }
+
+.info-about {
+  background: #f7fafc;
+  border-left: 3px solid #1a4f8a;
+  border-radius: 0 6px 6px 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #4a5568;
+  line-height: 1.65;
+}
+.info-about a { color: #1a4f8a; text-decoration: none; }
+.info-about a:hover { text-decoration: underline; }
+
+.info-divider {
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.info-terms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+.info-term {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.info-term p {
+  font-size: 0.82rem;
+  color: #718096;
+  line-height: 1.55;
+}
+.info-label {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  background: #ebf4ff;
+  color: #1a4f8a;
+  width: fit-content;
+  margin-bottom: 0.1rem;
+}
+.info-label.trend-up  { background: #c6f6d5; color: #276749; }
+.info-label.trend-down { background: #fed7d7; color: #9b2c2c; }
 
 /* ── Footer ── */
 footer {
