@@ -187,6 +187,7 @@ def main():
     # --- Lakes ---
     print("Processing lakes...")
     lakes = []
+    lake_dows = set()
     counties = set()
     with open(f"{INPUT_DIR}/all_counties_lakes.csv", newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
@@ -195,10 +196,23 @@ def main():
                 "name": row["name"],
                 "county": row["county"],
             })
+            lake_dows.add(row["id"])
             counties.add(row["county"])
 
-    with open(f"{OUTPUT_DIR}/lakes.json", "w") as f:
-        json.dump(lakes, f, separators=(",", ":"))
+    # Add lakes that appear in survey data but not in the Gazetteer
+    with open(f"{INPUT_DIR}/all_counties_catch_summaries.csv", newline="", encoding="utf-8") as f:
+        seen = set()
+        for row in csv.DictReader(f):
+            dow = row["dow_number"]
+            if dow not in lake_dows and dow not in seen:
+                lakes.append({
+                    "id": dow,
+                    "name": row["lake_name"],
+                    "county": row["county"],
+                })
+                lake_dows.add(dow)
+                counties.add(row["county"])
+                seen.add(dow)
     print(f"  {len(lakes)} lakes written")
 
     # --- Counties ---

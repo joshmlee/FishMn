@@ -111,11 +111,10 @@ async function onFilterChange() {
 
   const alreadyCached = neededCounties.every((c) => surveyCache[c]);
   if (!alreadyCached) {
-    showLoadingBar(true);
     await loadAllCountySurveys(neededCounties, (done, total) => {
-      updateLoadingBar(done, total);
+      document.getElementById("results-count").textContent =
+        `Loading… ${done}/${total} counties`;
     });
-    showLoadingBar(false);
   }
 
   const ranked = rankLakes(lakes, currentSpecies, currentSort, currentDateYears);
@@ -419,18 +418,6 @@ function renderSurveyTable(rows) {
       </table>
     </div>
   `;
-}
-
-// ── Loading bar ──
-function showLoadingBar(visible) {
-  document.getElementById("loading-bar").classList.toggle("hidden", !visible);
-}
-
-function updateLoadingBar(done, total) {
-  const pct = Math.round((done / total) * 100);
-  document.querySelector(".loading-bar-inner").style.width = `${pct}%`;
-  document.getElementById("loading-label").textContent =
-    `Loading survey data… ${done}/${total} counties`;
 }
 
 // ── Helpers ──
