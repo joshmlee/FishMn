@@ -45,6 +45,7 @@ SPECIES_NAMES = {
     "RBT": "Rainbow Trout",
     "BNT": "Brown Trout",
     "LKT": "Lake Trout",
+    "LAT": "Lake Trout",
     "SPT": "Splake",
     "TGM": "Tiger Muskellunge",
     "TGT": "Tiger Trout",
@@ -213,6 +214,8 @@ def main():
                 lake_dows.add(dow)
                 counties.add(row["county"])
                 seen.add(dow)
+    with open(f"{OUTPUT_DIR}/lakes.json", "w") as f:
+        json.dump(lakes, f, separators=(",", ":"))
     print(f"  {len(lakes)} lakes written")
 
     # --- Counties ---
