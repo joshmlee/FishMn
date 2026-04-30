@@ -152,9 +152,11 @@ function rankLakes(lakes, speciesCode, sortField, dateYears = 0) {
 
   for (const lake of lakes) {
     const countyData = surveyCache[lake.county] || {};
-    let rows = (countyData[lake.id] || []).filter(
-      (r) => r.species === speciesCode && r.gear === "Standard gill nets"
+    const allSpeciesRows = (countyData[lake.id] || []).filter(
+      (r) => r.species === speciesCode
     );
+    let rows = allSpeciesRows.filter((r) => r.gear === "Standard gill nets");
+    if (rows.length === 0) rows = allSpeciesRows; // fall back to any gear
     if (cutoff) rows = rows.filter((r) => r.date >= cutoff);
     if (rows.length === 0) continue;
 
