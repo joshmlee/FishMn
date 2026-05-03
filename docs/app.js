@@ -6,6 +6,7 @@ let currentCounty = "";
 let currentSpecies = "";
 let currentSort = "cpue";
 let currentDateYears = 0;  // 0 = any date
+let currentGear = "gill";
 let currentLake = null;
 
 // ── Boot ──
@@ -26,6 +27,7 @@ async function init() {
 
   document.getElementById("county-select").addEventListener("change", onFilterChange);
   document.getElementById("species-select").addEventListener("change", onFilterChange);
+  document.getElementById("gear-select").addEventListener("change", onSortChange);
   document.getElementById("sort-select").addEventListener("change", onSortChange);
   document.getElementById("date-select").addEventListener("change", onSortChange);
   document.getElementById("lake-search").addEventListener("input", onFilterChange);
@@ -89,8 +91,10 @@ async function onFilterChange() {
   currentCounty = document.getElementById("county-select").value;
   currentSpecies = document.getElementById("species-select").value;
 
+  const gearGroup = document.getElementById("gear-group");
   const sortGroup = document.getElementById("sort-group");
   const dateGroup = document.getElementById("date-group");
+  gearGroup.style.display = currentSpecies ? "" : "none";
   sortGroup.style.display = currentSpecies ? "" : "none";
   dateGroup.style.display = currentSpecies ? "" : "none";
 
@@ -122,6 +126,7 @@ async function onFilterChange() {
 }
 
 function onSortChange() {
+  currentGear = document.getElementById("gear-select").value;
   currentSort = document.getElementById("sort-select").value;
   currentDateYears = parseInt(document.getElementById("date-select").value, 10);
   if (!currentSpecies) return;
@@ -140,6 +145,18 @@ function filteredLakes() {
   });
 }
 
+const GEAR_FILTERS = {
+  gill:     (r) => r.gear === "Standard gill nets",
+  trap:     (r) => r.gear === "Standard trap nets",
+  electric: (r) => ["Backpack electrofishing", "Standard electrofishing", "Fall electrofishing", "Special electrofishing"].includes(r.gear),
+  seine:    (r) => ["Survey seining", "50-ft beach seine", "15-ft beach seine", "Special seining"].includes(r.gear),
+  all:      ()  => true,
+};
+
+function filterByGear(rows, gear) {
+  return rows.filter(GEAR_FILTERS[gear] || GEAR_FILTERS.all);
+}
+
 // For each lake, find the most recent Standard gill nets survey row for the
 // chosen species, then sort descending by the chosen metric.
 // dateYears: if > 0, only consider surveys from within the last N years.
@@ -155,8 +172,7 @@ function rankLakes(lakes, speciesCode, sortField, dateYears = 0) {
     const allSpeciesRows = (countyData[lake.id] || []).filter(
       (r) => r.species === speciesCode
     );
-    let rows = allSpeciesRows.filter((r) => r.gear === "Standard gill nets");
-    if (rows.length === 0) rows = allSpeciesRows; // fall back to any gear
+    let rows = filterByGear(allSpeciesRows, currentGear);
     if (cutoff) rows = rows.filter((r) => r.date >= cutoff);
     if (rows.length === 0) continue;
 
