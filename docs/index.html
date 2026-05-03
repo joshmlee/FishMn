@@ -52,6 +52,10 @@
               <p>Compares the most recent survey to the previous one for your selected metric. Green means the population is up, red means it's down.</p>
             </div>
             <div class="info-term">
+              <span class="info-label">Survey Method</span>
+              <p>Filters ranking by gear type. Gill nets are the standard for walleye and pike. Trap nets are better for panfish and rough fish. Electrofishing is the gold standard for bass. Use "All surveys" to see every lake with any data for your chosen species.</p>
+            </div>
+            <div class="info-term">
               <span class="info-label">Date Filter</span>
               <p>Limits results to lakes with recent survey data. Use "Last 5 years" to find lakes with the most current information.</p>
             </div>
@@ -72,6 +76,16 @@
         <label for="species-select">Species</label>
         <select id="species-select">
           <option value="">All species</option>
+        </select>
+      </div>
+      <div class="filter-group" id="gear-group" style="display:none">
+        <label for="gear-select">Survey method</label>
+        <select id="gear-select">
+          <option value="gill">Standard gill nets</option>
+          <option value="trap">Standard trap nets</option>
+          <option value="electric">Electrofishing</option>
+          <option value="seine">Seining</option>
+          <option value="all">All surveys</option>
         </select>
       </div>
       <div class="filter-group" id="sort-group" style="display:none">
