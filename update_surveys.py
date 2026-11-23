@@ -243,9 +243,30 @@ def update_lakes_json():
         print("  lakes.json already up to date")
 
 
+PROGRESS_FILE = ".update_progress"
+
+
+def save_progress(county_id):
+    with open(PROGRESS_FILE, "w") as f:
+        f.write(str(county_id))
+
+
+def load_progress():
+    if os.path.exists(PROGRESS_FILE):
+        with open(PROGRESS_FILE) as f:
+            return int(f.read().strip())
+    return 0
+
+
+def clear_progress():
+    if os.path.exists(PROGRESS_FILE):
+        os.remove(PROGRESS_FILE)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--county", help="Only update this county (exact name)")
+    parser.add_argument("--start-id", type=int, default=0, help="Start from county ID (1-87); 0 = auto-resume from progress file")
     parser.add_argument("--new-lakes-only", action="store_true", help="Only fetch new lakes, skip existing DOWs")
     args = parser.parse_args()
 
@@ -256,7 +277,10 @@ if __name__ == "__main__":
         if not counties:
             raise SystemExit(f"County not found: {args.county}")
     else:
-        counties = MN_COUNTIES
+        start_id = args.start_id or (load_progress() + 1)
+        if start_id > 1:
+            print(f"Resuming from county ID {start_id}...")
+        counties = [(cid, cname) for cid, cname in MN_COUNTIES if cid >= start_id]
 
     total_surveys = 0
     total_lakes = 0
@@ -272,7 +296,11 @@ if __name__ == "__main__":
         total_surveys += s
         total_lakes += l
         total_checked += c
+        if not args.county:
+            save_progress(county_id)
 
+    if not args.county:
+        clear_progress()
     update_lakes_json()
 
     print(f"\n=== Done ===")
