@@ -61,13 +61,22 @@ MN_COUNTIES = [
 ]
 
 
-def fetch_jsonp(url, params):
+def fetch_jsonp(url, params, retries=5):
     params["callback"] = "cb"
-    r = requests.get(url, params=params, timeout=30)
-    r.raise_for_status()
-    text = r.text.strip()
-    m = re.match(r"^\w+\((.*)\);?$", text, re.DOTALL)
-    return json.loads(m.group(1) if m else text)
+    for attempt in range(retries):
+        try:
+            r = requests.get(url, params=params, timeout=30)
+            r.raise_for_status()
+            text = r.text.strip()
+            m = re.match(r"^\w+\((.*)\);?$", text, re.DOTALL)
+            return json.loads(m.group(1) if m else text)
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = 2 ** attempt  # 1, 2, 4, 8, 16 seconds
+                print(f"    Retry {attempt + 1}/{retries - 1} after {wait}s: {e}")
+                time.sleep(wait)
+            else:
+                raise
 
 
 def get_lakes_in_county(county_id):
